@@ -1,0 +1,6 @@
+dist/
+node_modules/
+ssl/*.key
+ssl/*.crt
+*.tsbuildinfo
+*.tgz
