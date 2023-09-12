@@ -485,6 +485,25 @@ export const relayClientBasicFactory = (
             valueCodec,
             blockStore: transientStore,
           });
+        const localParentVersions: Version[] =
+          localVersionStoreTransient.parentVersions(localVersionRoot);
+        localParentVersions.shift();
+        for (const parentVersion of localParentVersions) {
+          const graphVersionBundle: Block = await packGraphVersion(
+            parentVersion.root,
+            blockStore
+          );
+          await restoreGraphVersion(graphVersionBundle.bytes, transientStore);
+        }
+        const remoteParentVersions: Version[] =
+          remoteVersionStore.parentVersions(remoteVersionRoot);
+        remoteParentVersions.shift();
+        for (const parentVersion of remoteParentVersions) {
+          const graphVersionBundleBytes: Uint8Array = await plumbing.graphPull(
+            linkCodec.encodeString(parentVersion.root)
+          );
+          await restoreGraphVersion(graphVersionBundleBytes, transientStore);
+        }
         const {
           root: mergedRoot,
           index: mergedIndex,
