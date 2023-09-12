@@ -392,7 +392,7 @@ export const relayClientBasicFactory = (
             }
           }
         }
-        transientStore.push(blockStore);
+        await transientStore.push(blockStore);
         const remoteVersionStoreLocalized: VersionStore =
           await versionStoreFactory({
             storeRoot: remoteVersionStoreRoot,

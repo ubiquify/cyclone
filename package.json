@@ -1,6 +1,6 @@
 {
   "name": "@ubiquify/cyclone",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Ubiquify relay http(s) client",
   "repository": "https://github.com/ubiquify/cyclone.git",
   "type": "module",
@@ -24,14 +24,14 @@
   "author": "ubiquifier <ubiquify@proton.me>",
   "dependencies": {
     "@dstanesc/wasm-chunking-fastcdc-node": "^0.1.1",
-    "@ubiquify/core": "^0.0.4",
+    "@ubiquify/core": "^0.0.5",
     "express": "^4.18.2"
   },
   "devDependencies": {
     "@types/express": "^4.17.17",
     "@types/jest": "^29.5.2",
     "@types/supertest": "^2.0.12",
-    "@ubiquify/relay": "^0.0.5",
+    "@ubiquify/relay": "^0.0.8",
     "axios": "^1.4.0",
     "cross-env": "^7.0.3",
     "jest": "^29.5.0",
