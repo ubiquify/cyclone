@@ -323,210 +323,63 @@ export const relayClientBasicFactory = (
     | undefined
   > => {
     let remoteVersionStoreBytes: Uint8Array | undefined;
-    if (incremental && localVersionStoreRoot !== undefined) {
-      try {
-        remoteVersionStoreBytes = await plumbing.storePull(
-          chunkSize,
-          versionStoreId
-        );
-      } catch (error) {
-        if (axios.isAxiosError(error)) {
-          const axiosError: AxiosError = error;
-          if (axiosError.response?.status !== 404) {
-            throw error;
-          }
+    try {
+      remoteVersionStoreBytes = await plumbing.storePull(
+        chunkSize,
+        versionStoreId
+      );
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const axiosError: AxiosError = error;
+        if (axiosError.response?.status !== 404) {
+          throw error;
         }
       }
-      if (remoteVersionStoreBytes !== undefined) {
-        const diffStore: MemoryBlockStore = memoryBlockStoreFactory();
-        const { root: remoteVersionStoreRoot } = await restoreVersionStore(
-          remoteVersionStoreBytes,
-          diffStore
-        );
-        const remoteVersionStore: VersionStore = await versionStoreFactory({
-          storeRoot: remoteVersionStoreRoot,
-          chunk,
-          linkCodec,
-          valueCodec,
-          blockStore: diffStore,
-        });
-        const remoteVersionRoot: Link = remoteVersionStore.currentRoot();
-        const localVersionStore: VersionStore = await versionStoreFactory({
-          storeRoot: localVersionStoreRoot,
-          chunk,
-          linkCodec,
-          valueCodec,
-          blockStore,
-        });
-        const localVersionRoot = localVersionStore.currentRoot();
-        if (
-          linkCodec.encodeString(localVersionRoot) !==
-          linkCodec.encodeString(remoteVersionRoot)
-        ) {
-          const remoteRootIndexBytes = await plumbing.indexPull(
-            linkCodec.encodeString(remoteVersionRoot)
-          );
-          const { blocks: remoteRootIndexBlocks } = await restoreRootIndex(
-            remoteRootIndexBytes,
-            diffStore
-          );
-          const localRootIndexBundle: Block = await packRootIndex(
-            localVersionRoot,
-            blockStore
-          );
-          const { blocks: localRootIndexBlocks } = await restoreRootIndex(
-            localRootIndexBundle.bytes,
-            diffStore
-          );
-          const requiredBlockIdentifiers: string[] = [];
-          for (const block of remoteRootIndexBlocks) {
-            const linkString = linkCodec.encodeString(block.cid);
-            if (
-              !localRootIndexBlocks
-                .map((block) => linkCodec.encodeString(block.cid))
-                .includes(linkString)
-            ) {
-              requiredBlockIdentifiers.push(linkString);
-            }
-          }
-          const blockIndexBuilder = blockIndexFactory({
-            linkCodec,
-            blockStore: diffStore,
-          });
+    }
 
-          const contentDiff: ContentDiff =
-            await blockIndexBuilder.diffRootIndex({
-              currentRoot: localVersionRoot,
-              otherRoot: remoteVersionRoot,
-            });
-          for (const link of contentDiff.added) {
-            requiredBlockIdentifiers.push(linkCodec.encodeString(link));
-          }
-          const randomBlocksBundle: Uint8Array | undefined =
-            await plumbing.blocksPull(requiredBlockIdentifiers);
+    if (remoteVersionStoreBytes === undefined) {
+      return undefined;
+    }
+    const graphStore = graphStoreFactory({
+      chunk,
+      linkCodec,
+      valueCodec,
+      blockStore,
+    });
 
-          if (randomBlocksBundle !== undefined) {
-            const selectedBlocks = await restoreRandomBlocks(
-              randomBlocksBundle,
-              diffStore
-            );
-            const localVersionStoreBundle: Block = await packVersionStore(
-              localVersionStoreRoot,
-              blockStore,
-              chunk,
-              valueCodec
-            );
-            const { root: storeRootExisting } = await restoreVersionStore(
-              localVersionStoreBundle.bytes,
-              diffStore
-            );
-            const graphStoreBundleExisting: Block = await packGraphVersion(
-              localVersionRoot,
-              blockStore
-            );
-            const { root: versionRootExisting } = await restoreGraphVersion(
-              graphStoreBundleExisting.bytes,
-              diffStore
-            );
-            const versionStoreExisting: VersionStore =
-              await versionStoreFactory({
-                storeRoot: localVersionStoreRoot,
-                versionRoot: localVersionRoot,
-                chunk,
-                linkCodec,
-                valueCodec,
-                blockStore: diffStore,
-              });
-            const {
-              root: mergedRoot,
-              index: mergedIndex,
-              blocks: mergedBlocks,
-            } = await versionStoreExisting.mergeVersions(remoteVersionStore);
-            await diffStore.push(blockStore);
-            const mergedVersionRoot = versionStoreExisting.currentRoot();
-            const mergedVersionStoreRoot =
-              versionStoreExisting.versionStoreRoot();
-            const versionStore: VersionStore = await versionStoreFactory({
-              storeRoot: mergedVersionStoreRoot,
-              versionRoot: mergedVersionRoot,
-              chunk,
-              linkCodec,
-              valueCodec,
-              blockStore,
-            });
-            const graphStore = graphStoreFactory({
-              chunk,
-              linkCodec,
-              valueCodec,
-              blockStore,
-            });
-            const graph = new Graph(versionStore, graphStore);
-            return {
-              versionStore,
-              graphStore,
-              graph,
-            };
-          } else {
-            throw new Error(
-              `Failed to pull selected blocks: ${JSON.stringify(
-                requiredBlockIdentifiers
-              )}`
-            );
-          }
-        } else {
-          const versionStore = await versionStoreFactory({
-            storeRoot: localVersionStoreRoot,
-            versionRoot: localVersionRoot,
-            chunk,
-            linkCodec,
-            valueCodec,
-            blockStore,
-          });
-          const graphStore = graphStoreFactory({
-            chunk,
-            linkCodec,
-            valueCodec,
-            blockStore,
-          });
-          const graph = new Graph(versionStore, graphStore);
-          return {
-            versionStore,
-            graphStore,
-            graph,
-          };
-        }
-      } else {
-        return undefined;
-      }
-    } else {
-      try {
-        remoteVersionStoreBytes = await plumbing.storePull(
-          chunkSize,
-          versionStoreId
-        );
-      } catch (error) {
-        if (axios.isAxiosError(error)) {
-          const axiosError: AxiosError = error;
-          if (axiosError.response?.status !== 404) {
-            throw error;
-          }
-        }
-      }
-      if (remoteVersionStoreBytes !== undefined) {
-        const transientStore: MemoryBlockStore = memoryBlockStoreFactory();
-        const {
-          root: versionStoreRoot,
-          index: versionStoreIndex,
-          blocks: versionStoreBlocks,
-        } = await restoreVersionStore(remoteVersionStoreBytes, transientStore);
-        const versionStoreRemote: VersionStore = await versionStoreFactory({
-          storeRoot: versionStoreRoot,
-          chunk,
-          linkCodec,
-          valueCodec,
-          blockStore: transientStore,
-        });
-        const remoteVersions: Version[] = versionStoreRemote.log();
+    const transientStore: MemoryBlockStore = memoryBlockStoreFactory();
+    const { root: remoteVersionStoreRoot } = await restoreVersionStore(
+      remoteVersionStoreBytes,
+      transientStore
+    );
+    const remoteVersionStore: VersionStore = await versionStoreFactory({
+      storeRoot: remoteVersionStoreRoot,
+      chunk,
+      linkCodec,
+      valueCodec,
+      blockStore: transientStore,
+    });
+    const remoteVersionRoot: Link = remoteVersionStore.currentRoot();
+
+    let localVersionRoot: Link;
+    if (localVersionStoreRoot !== undefined) {
+      const localVersionStore = await versionStoreFactory({
+        storeRoot: localVersionStoreRoot,
+        chunk,
+        linkCodec,
+        valueCodec,
+        blockStore,
+      });
+      localVersionRoot = localVersionStore.currentRoot();
+      if (localVersionStore.includesVersion(remoteVersionRoot)) {
+        const graph = new Graph(localVersionStore, graphStore);
+        return {
+          versionStore: localVersionStore,
+          graphStore,
+          graph,
+        };
+      } else if (remoteVersionStore.includesVersion(localVersionRoot)) {
+        const remoteVersions: Version[] = remoteVersionStore.log();
         for (const version of remoteVersions) {
           try {
             await blockStore.get(version.root);
@@ -539,89 +392,219 @@ export const relayClientBasicFactory = (
             }
           }
         }
-        if (localVersionStoreRoot !== undefined) {
-          const localVersionStoreBundle: Block = await packVersionStore(
-            localVersionStoreRoot,
-            blockStore,
+        transientStore.push(blockStore);
+        const remoteVersionStoreLocalized: VersionStore =
+          await versionStoreFactory({
+            storeRoot: remoteVersionStoreRoot,
             chunk,
-            valueCodec
-          );
-          const { root: storeRootExisting } = await restoreVersionStore(
-            localVersionStoreBundle.bytes,
-            transientStore
-          );
+            linkCodec,
+            valueCodec,
+            blockStore,
+          });
+        const graph = new Graph(remoteVersionStoreLocalized, graphStore);
+        return {
+          versionStore: remoteVersionStoreLocalized,
+          graphStore,
+          graph,
+        };
+      } else {
+        const localVersionStoreBundle: Block = await packVersionStore(
+          localVersionStoreRoot,
+          blockStore,
+          chunk,
+          valueCodec
+        );
+        const { root } = await restoreVersionStore(
+          localVersionStoreBundle.bytes,
+          transientStore
+        );
+      }
+    }
 
-          const versionStoreLocal: VersionStore = await versionStoreFactory({
+    if (incremental && localVersionRoot !== undefined) {
+      const remoteRootIndexBytes = await plumbing.indexPull(
+        linkCodec.encodeString(remoteVersionRoot)
+      );
+      const { blocks: remoteRootIndexBlocks } = await restoreRootIndex(
+        remoteRootIndexBytes,
+        transientStore
+      );
+      const localRootIndexBundle: Block = await packRootIndex(
+        localVersionRoot,
+        blockStore
+      );
+      const { blocks: localRootIndexBlocks } = await restoreRootIndex(
+        localRootIndexBundle.bytes,
+        transientStore
+      );
+      const requiredBlockIdentifiers: string[] = [];
+      for (const block of remoteRootIndexBlocks) {
+        const linkString = linkCodec.encodeString(block.cid);
+        if (
+          !localRootIndexBlocks
+            .map((block) => linkCodec.encodeString(block.cid))
+            .includes(linkString)
+        ) {
+          requiredBlockIdentifiers.push(linkString);
+        }
+      }
+      const blockIndexBuilder = blockIndexFactory({
+        linkCodec,
+        blockStore: transientStore,
+      });
+
+      const contentDiff: ContentDiff = await blockIndexBuilder.diffRootIndex({
+        currentRoot: localVersionRoot,
+        otherRoot: remoteVersionRoot,
+      });
+      for (const link of contentDiff.added) {
+        requiredBlockIdentifiers.push(linkCodec.encodeString(link));
+      }
+      const randomBlocksBundle: Uint8Array | undefined =
+        await plumbing.blocksPull(requiredBlockIdentifiers);
+
+      if (randomBlocksBundle !== undefined) {
+        const selectedBlocks = await restoreRandomBlocks(
+          randomBlocksBundle,
+          transientStore
+        );
+        const graphStoreBundleExisting: Block = await packGraphVersion(
+          localVersionRoot,
+          blockStore
+        );
+        const { root: versionRootExisting } = await restoreGraphVersion(
+          graphStoreBundleExisting.bytes,
+          transientStore
+        );
+        const localVersionStoreTransient: VersionStore =
+          await versionStoreFactory({
             storeRoot: localVersionStoreRoot,
+            versionRoot: localVersionRoot,
+            chunk,
+            linkCodec,
+            valueCodec,
+            blockStore: transientStore,
+          });
+        const {
+          root: mergedRoot,
+          index: mergedIndex,
+          blocks: mergedBlocks,
+        } = await localVersionStoreTransient.mergeVersions(remoteVersionStore);
+        const mergedVersionRoot = localVersionStoreTransient.currentRoot();
+        const mergedVersionStoreRoot =
+          localVersionStoreTransient.versionStoreRoot();
+        await transientStore.push(blockStore);
+        const versionStore: VersionStore = await versionStoreFactory({
+          storeRoot: mergedVersionStoreRoot,
+          versionRoot: mergedVersionRoot,
+          chunk,
+          linkCodec,
+          valueCodec,
+          blockStore,
+        });
+        const graph = new Graph(versionStore, graphStore);
+        return {
+          versionStore,
+          graphStore,
+          graph,
+        };
+      } else {
+        throw new Error(
+          `Failed to pull selected blocks: ${JSON.stringify(
+            requiredBlockIdentifiers
+          )}`
+        );
+      }
+    } else {
+      const remoteVersions: Version[] = remoteVersionStore.log();
+      for (const version of remoteVersions) {
+        try {
+          await blockStore.get(version.root);
+        } catch (e) {
+          const graphVersionBytes = await plumbing.graphPull(
+            version.root.toString()
+          );
+          if (graphVersionBytes !== undefined) {
+            await restoreGraphVersion(graphVersionBytes, transientStore);
+          }
+        }
+      }
+      if (
+        localVersionStoreRoot !== undefined &&
+        localVersionRoot !== undefined
+      ) {
+        const localVersionStoreTransient: VersionStore =
+          await versionStoreFactory({
+            storeRoot: localVersionStoreRoot,
+            versionRoot: localVersionRoot,
             chunk,
             linkCodec,
             valueCodec,
             blockStore: transientStore,
           });
 
-          const localVersions: Version[] = versionStoreLocal.log();
-          for (const version of localVersions) {
-            const localGraphVersionBundle = await packGraphVersion(
-              version.root,
-              blockStore
-            );
-            await restoreGraphVersion(
-              localGraphVersionBundle.bytes,
-              transientStore
-            );
-          }
-          const {
-            root: mergedRoot,
-            index: mergedIndex,
-            blocks: mergedBlocks,
-          } = await versionStoreLocal.mergeVersions(versionStoreRemote);
-          await transientStore.push(blockStore);
-          const mergedVersionRoot = versionStoreLocal.currentRoot();
-          const mergedVersionStoreRoot = versionStoreLocal.versionStoreRoot();
-          const versionStore: VersionStore = await versionStoreFactory({
-            storeRoot: mergedVersionStoreRoot,
-            versionRoot: mergedVersionRoot,
-            chunk,
-            linkCodec,
-            valueCodec,
-            blockStore,
-          });
-          const graphStore = graphStoreFactory({
-            chunk,
-            linkCodec,
-            valueCodec,
-            blockStore,
-          });
-          const graph = new Graph(versionStore, graphStore);
-          return {
-            versionStore,
-            graphStore,
-            graph,
-          };
-        } else {
-          await transientStore.push(blockStore);
-          const versionStore: VersionStore = await versionStoreFactory({
-            storeRoot: versionStoreRoot,
-            chunk,
-            linkCodec,
-            valueCodec,
-            blockStore,
-          });
-          const graphStore = graphStoreFactory({
-            chunk,
-            linkCodec,
-            valueCodec,
-            blockStore,
-          });
-          const graph = new Graph(versionStore, graphStore);
-          return {
-            versionStore,
-            graphStore,
-            graph,
-          };
+        const localVersions: Version[] = localVersionStoreTransient.log();
+        for (const version of localVersions) {
+          const localGraphVersionBundle = await packGraphVersion(
+            version.root,
+            blockStore
+          );
+          await restoreGraphVersion(
+            localGraphVersionBundle.bytes,
+            transientStore
+          );
         }
+        const {
+          root: mergedRoot,
+          index: mergedIndex,
+          blocks: mergedBlocks,
+        } = await localVersionStoreTransient.mergeVersions(remoteVersionStore);
+        const mergedVersionRoot = localVersionStoreTransient.currentRoot();
+        const mergedVersionStoreRoot =
+          localVersionStoreTransient.versionStoreRoot();
+        await transientStore.push(blockStore);
+        const versionStore: VersionStore = await versionStoreFactory({
+          storeRoot: mergedVersionStoreRoot,
+          versionRoot: mergedVersionRoot,
+          chunk,
+          linkCodec,
+          valueCodec,
+          blockStore,
+        });
+        const graphStore = graphStoreFactory({
+          chunk,
+          linkCodec,
+          valueCodec,
+          blockStore,
+        });
+        const graph = new Graph(versionStore, graphStore);
+        return {
+          versionStore,
+          graphStore,
+          graph,
+        };
       } else {
-        return undefined;
+        await transientStore.push(blockStore);
+        const versionStore: VersionStore = await versionStoreFactory({
+          storeRoot: remoteVersionStoreRoot,
+          versionRoot: remoteVersionRoot,
+          chunk,
+          linkCodec,
+          valueCodec,
+          blockStore,
+        });
+        const graphStore = graphStoreFactory({
+          chunk,
+          linkCodec,
+          valueCodec,
+          blockStore,
+        });
+        const graph = new Graph(versionStore, graphStore);
+        return {
+          versionStore,
+          graphStore,
+          graph,
+        };
       }
     }
   };
