@@ -90,6 +90,13 @@ describe("Plumbing client tests", () => {
       expect(version).toEqual({ major: 0, minor: 1, patch: 0 });
     });
 
+    it("should return undefined when resolving non-existent version store identifier", async () => {
+      const cid = await relayClient.storeResolve(
+        "bafkreiflyrpgzvjjg3ve36ecgv24k5zfjc6hdz7yttko36ho7hy3yhgru"
+      );
+      expect(cid).toBeUndefined();
+    });
+
     it("should record complete graph history", async () => {
       const blockStore: MemoryBlockStore = memoryBlockStoreFactory();
       const versionStore: VersionStore = await versionStoreFactory({

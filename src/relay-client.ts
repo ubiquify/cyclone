@@ -673,12 +673,23 @@ export const relayClientPlumbingFactory = (
   const storeResolve = async (
     versionStoreId: string
   ): Promise<string | undefined> => {
-    const response = await httpClient.get("/store/resolve", {
-      params: {
-        id: versionStoreId,
-      },
-    });
-    return response.data;
+    try {
+      const response = await httpClient.get("/store/resolve", {
+        params: {
+          id: versionStoreId,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const axiosError: AxiosError = error;
+        if (axiosError.response?.status !== 404) {
+          throw error;
+        } else {
+          return undefined;
+        }
+      }
+    }
   };
 
   const graphPush = async (
