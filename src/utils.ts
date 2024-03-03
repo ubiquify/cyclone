@@ -21,3 +21,10 @@ export const memoryBlockSinkFactory = (): MapBlockSink => {
     },
   };
 };
+
+export function toBuffer(array: Uint8Array): ArrayBuffer {
+  return array.buffer.slice(
+    array.byteOffset,
+    array.byteLength + array.byteOffset
+  );
+}

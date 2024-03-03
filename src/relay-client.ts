@@ -17,7 +17,7 @@ import {
   versionStoreFactory,
 } from "@ubiquify/core";
 import axios, { AxiosError, AxiosResponse, CreateAxiosDefaults } from "axios";
-import { MapBlockSink, memoryBlockSinkFactory } from "./utils";
+import { MapBlockSink, memoryBlockSinkFactory, toBuffer } from "./utils";
 
 export interface RelayClientPlumbing {
   storePush(
@@ -639,7 +639,8 @@ export const relayClientPlumbingFactory = (
     chunkSize: number,
     bytes: Uint8Array
   ): Promise<PlumbingStorePushResponse> => {
-    const response = await httpClient.put("/store/push", bytes.buffer, {
+    const buffer = toBuffer(bytes);
+    const response = await httpClient.put("/store/push", buffer, {
       params: {
         chunkSize: chunkSize,
       },
@@ -695,7 +696,8 @@ export const relayClientPlumbingFactory = (
   const graphPush = async (
     bytes: Uint8Array
   ): Promise<PlumbingGraphPushResponse> => {
-    const response = await httpClient.put("/graph/version/push", bytes.buffer, {
+    const buffer = toBuffer(bytes);
+    const response = await httpClient.put("/graph/version/push", buffer, {
       headers: {
         "Content-Type": "application/octet-stream",
       },
@@ -742,7 +744,8 @@ export const relayClientPlumbingFactory = (
   const blocksPush = async (
     bytes: Uint8Array
   ): Promise<PlumbingBlocksPushResponse> => {
-    const response = await httpClient.put("/blocks/push", bytes.buffer, {
+    const buffer = toBuffer(bytes);
+    const response = await httpClient.put("/blocks/push", buffer, {
       headers: {
         "Content-Type": "application/octet-stream",
       },
