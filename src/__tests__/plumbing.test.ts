@@ -69,12 +69,12 @@ describe("Plumbing client tests", () => {
     relayBlockStore = memoryBlockStoreFactory();
     linkResolver = memoryBlockResolverFactory();
     graphRelay = createGraphRelay(relayBlockStore, linkResolver);
-    server = graphRelay.startHttps(3000, getCertificate(), done);
+    server = graphRelay.startHttps(3002, getCertificate(), done);
     relayClient = relayClientPlumbingFactory({
       httpsAgent: new https.Agent({
         rejectUnauthorized: false,
       }),
-      baseURL: "https://localhost:3000",
+      baseURL: "https://localhost:3002",
     });
   });
 
